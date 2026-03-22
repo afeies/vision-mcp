@@ -1,8 +1,31 @@
 import os
+import time
 import cv2
 from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP("opencv-vision")
+
+SUPPORTED_FORMATS = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"}
+
+
+def validate_image(image_path: str):
+    """Validate that the image exists and is a supported format. Returns (img, error)."""
+    if not os.path.isfile(image_path):
+        return None, f"Error: file not found: {image_path}"
+    ext = os.path.splitext(image_path)[1].lower()
+    if ext not in SUPPORTED_FORMATS:
+        return None, f"Error: unsupported format '{ext}'. Supported: {', '.join(SUPPORTED_FORMATS)}"
+    img = cv2.imread(image_path)
+    if img is None:
+        return None, f"Error: could not read image at {image_path} (file may be corrupt)"
+    return img, None
+
+
+def output_path(image_path: str, suffix: str) -> str:
+    """Generate a unique output path using a timestamp."""
+    base = os.path.splitext(os.path.basename(image_path))[0]
+    ts = int(time.time())
+    return os.path.join("output", f"{base}_{suffix}_{ts}.jpg")
 
 
 @mcp.tool()
@@ -17,17 +40,16 @@ def detect_edges(image_path: str, low_threshold: int = 50, high_threshold: int =
     Returns:
         Path to the output edge-detected image.
     """
-    img = cv2.imread(image_path)
-    if img is None:
-        return f"Error: could not read image at {image_path}"
+    img, err = validate_image(image_path)
+    if err:
+        return err
 
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     edges = cv2.Canny(gray, low_threshold, high_threshold)
 
-    base = os.path.splitext(os.path.basename(image_path))[0]
-    output_path = os.path.join("output", f"{base}_edges.jpg")
-    cv2.imwrite(output_path, edges)
-    return output_path
+    out = output_path(image_path, "edges")
+    cv2.imwrite(out, edges)
+    return out
 
 
 @mcp.tool()
@@ -40,9 +62,9 @@ def analyze_image(image_path: str) -> dict:
     Returns:
         Dictionary with width, height, mean color per channel (BGR), and brightness.
     """
-    img = cv2.imread(image_path)
-    if img is None:
-        return {"error": f"could not read image at {image_path}"}
+    img, err = validate_image(image_path)
+    if err:
+        return {"error": err}
 
     height, width = img.shape[:2]
     mean_bgr = img.mean(axis=(0, 1)).tolist()
@@ -70,9 +92,9 @@ def detect_faces(image_path: str, save_annotated: bool = True) -> list[dict]:
     Returns:
         List of dicts with x, y, w, h for each detected face.
     """
-    img = cv2.imread(image_path)
-    if img is None:
-        return [{"error": f"could not read image at {image_path}"}]
+    img, err = validate_image(image_path)
+    if err:
+        return [{"error": err}]
 
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
@@ -87,10 +109,9 @@ def detect_faces(image_path: str, save_annotated: bool = True) -> list[dict]:
             cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
     if save_annotated and len(results) > 0:
-        base = os.path.splitext(os.path.basename(image_path))[0]
-        output_path = os.path.join("output", f"{base}_faces.jpg")
-        cv2.imwrite(output_path, img)
-        results.append({"annotated_image": output_path})
+        out = output_path(image_path, "faces")
+        cv2.imwrite(out, img)
+        results.append({"annotated_image": out})
 
     return results
 
