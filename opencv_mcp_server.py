@@ -21,6 +21,27 @@ def validate_image(image_path: str):
     return img, None
 
 
+def success_response(tool: str, result: dict, suggestions: list[str] = []) -> dict:
+    """Wrap a tool result in the standard response envelope."""
+    return {
+        "status": "success",
+        "tool": tool,
+        "result": result,
+        "suggestions": suggestions,
+    }
+
+
+def error_response(tool: str, error_code: str, message: str, recovery_hint: str) -> dict:
+    """Wrap an error in the standard response envelope."""
+    return {
+        "status": "error",
+        "tool": tool,
+        "error_code": error_code,
+        "message": message,
+        "recovery_hint": recovery_hint,
+    }
+
+
 def output_path(image_path: str, suffix: str) -> str:
     """Generate a unique output path using a timestamp."""
     base = os.path.splitext(os.path.basename(image_path))[0]
