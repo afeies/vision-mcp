@@ -8,16 +8,22 @@ mcp = FastMCP("opencv-vision")
 SUPPORTED_FORMATS = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"}
 
 
-def validate_image(image_path: str):
-    """Validate that the image exists and is a supported format. Returns (img, error)."""
+def validate_image(image_path: str, tool: str):
+    """Validate that the image exists and is a supported format. Returns (img, error_response or None)."""
     if not os.path.isfile(image_path):
-        return None, f"Error: file not found: {image_path}"
+        return None, error_response(tool, "FILE_NOT_FOUND",
+            f"File not found: {image_path}",
+            "Check the path or ask the user for the correct filename")
     ext = os.path.splitext(image_path)[1].lower()
     if ext not in SUPPORTED_FORMATS:
-        return None, f"Error: unsupported format '{ext}'. Supported: {', '.join(SUPPORTED_FORMATS)}"
+        return None, error_response(tool, "UNSUPPORTED_FORMAT",
+            f"Unsupported format '{ext}'. Supported: {', '.join(SUPPORTED_FORMATS)}",
+            "Ask the user for an image in a supported format like .jpg or .png")
     img = cv2.imread(image_path)
     if img is None:
-        return None, f"Error: could not read image at {image_path} (file may be corrupt)"
+        return None, error_response(tool, "CORRUPT_IMAGE",
+            f"Could not read image at {image_path}",
+            "The file may be corrupt. Ask the user to provide a different image")
     return img, None
 
 
@@ -83,23 +89,26 @@ def analyze_image(image_path: str) -> dict:
     Returns:
         Dictionary with width, height, mean color per channel (BGR), and brightness.
     """
-    img, err = validate_image(image_path)
+    img, err = validate_image(image_path, "analyze_image")
     if err:
-        return {"error": err}
+        return err
 
     height, width = img.shape[:2]
     mean_bgr = img.mean(axis=(0, 1)).tolist()
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     brightness = float(gray.mean())
 
-    return {
+    return success_response("analyze_image", {
         "width": width,
         "height": height,
         "mean_blue": round(mean_bgr[0], 2),
         "mean_green": round(mean_bgr[1], 2),
         "mean_red": round(mean_bgr[2], 2),
         "brightness": round(brightness, 2),
-    }
+    }, suggestions=[
+        "Run detect_edges to see the shape boundaries in this image",
+        "Run detect_faces to check for people in this image",
+    ])
 
 
 @mcp.tool()
