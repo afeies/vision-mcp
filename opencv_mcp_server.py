@@ -67,7 +67,7 @@ def detect_edges(image_path: str, low_threshold: int = 50, high_threshold: int =
     Returns:
         Path to the output edge-detected image.
     """
-    img, err = validate_image(image_path)
+    img, err = validate_image(image_path, "detect_edges")
     if err:
         return err
 
@@ -76,7 +76,14 @@ def detect_edges(image_path: str, low_threshold: int = 50, high_threshold: int =
 
     out = output_path(image_path, "edges")
     cv2.imwrite(out, edges)
-    return out
+    return success_response("detect_edges", {
+        "output_path": out,
+        "low_threshold": low_threshold,
+        "high_threshold": high_threshold,
+    }, suggestions=[
+        "Run analyze_image on the original to compare brightness and color stats",
+        "Try different thresholds — lower values detect faint edges, higher values only strong edges",
+    ])
 
 
 @mcp.tool()
@@ -122,9 +129,9 @@ def detect_faces(image_path: str, save_annotated: bool = True) -> list[dict]:
     Returns:
         List of dicts with x, y, w, h for each detected face.
     """
-    img, err = validate_image(image_path)
+    img, err = validate_image(image_path, "detect_faces")
     if err:
-        return [{"error": err}]
+        return err
 
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
@@ -132,18 +139,23 @@ def detect_faces(image_path: str, save_annotated: bool = True) -> list[dict]:
     face_cascade = cv2.CascadeClassifier(cascade_path)
     faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
 
-    results = []
+    face_list = []
     for (x, y, w, h) in faces:
-        results.append({"x": int(x), "y": int(y), "w": int(w), "h": int(h)})
+        face_list.append({"x": int(x), "y": int(y), "w": int(w), "h": int(h)})
         if save_annotated:
             cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
-    if save_annotated and len(results) > 0:
+    result = {"face_count": len(face_list), "faces": face_list}
+
+    if save_annotated and len(face_list) > 0:
         out = output_path(image_path, "faces")
         cv2.imwrite(out, img)
-        results.append({"annotated_image": out})
+        result["annotated_image"] = out
 
-    return results
+    return success_response("detect_faces", result, suggestions=[
+        "Run analyze_image to get color and brightness stats for this image",
+        "Run detect_edges to see the structural outlines in this image",
+    ])
 
 
 if __name__ == "__main__":
