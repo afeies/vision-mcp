@@ -56,7 +56,7 @@ def output_path(image_path: str, suffix: str) -> str:
 
 
 @mcp.tool()
-def detect_edges(image_path: str, low_threshold: int = 50, high_threshold: int = 150) -> str:
+def detect_edges(image_path: str, low_threshold: int = 50, high_threshold: int = 150) -> dict:
     """Detect edges in an image using Canny edge detection.
 
     Args:
@@ -119,7 +119,7 @@ def analyze_image(image_path: str) -> dict:
 
 
 @mcp.tool()
-def detect_faces(image_path: str, save_annotated: bool = True) -> list[dict]:
+def detect_faces(image_path: str, save_annotated: bool = True) -> dict:
     """Detect faces in an image using Haar cascade classifier.
 
     Args:
