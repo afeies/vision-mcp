@@ -27,12 +27,13 @@ def validate_image(image_path: str, tool: str):
     return img, None
 
 
-def success_response(tool: str, result: dict, suggestions: list[str] = []) -> dict:
+def success_response(tool: str, result: dict, message: str, suggestions: list[str] = []) -> dict:
     """Wrap a tool result in the standard response envelope."""
     return {
         "status": "success",
         "tool": tool,
         "result": result,
+        "message": message,
         "suggestions": suggestions,
     }
 
@@ -80,7 +81,9 @@ def detect_edges(image_path: str, low_threshold: int = 50, high_threshold: int =
         "output_path": out,
         "low_threshold": low_threshold,
         "high_threshold": high_threshold,
-    }, suggestions=[
+    },
+    message=f"Edge detection complete (thresholds: {low_threshold}/{high_threshold}). Output saved to {out}. You could run analyze_image on the original to compare brightness and color stats, or try different thresholds — lower values detect faint edges, higher values only strong edges.",
+    suggestions=[
         "Run analyze_image on the original to compare brightness and color stats",
         "Try different thresholds — lower values detect faint edges, higher values only strong edges",
     ])
@@ -105,14 +108,17 @@ def analyze_image(image_path: str) -> dict:
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     brightness = float(gray.mean())
 
+    brightness_rounded = round(brightness, 2)
     return success_response("analyze_image", {
         "width": width,
         "height": height,
         "mean_blue": round(mean_bgr[0], 2),
         "mean_green": round(mean_bgr[1], 2),
         "mean_red": round(mean_bgr[2], 2),
-        "brightness": round(brightness, 2),
-    }, suggestions=[
+        "brightness": brightness_rounded,
+    },
+    message=f"Image is {width}x{height} with brightness {brightness_rounded}/255. Mean color (BGR): blue={round(mean_bgr[0], 2)}, green={round(mean_bgr[1], 2)}, red={round(mean_bgr[2], 2)}. You could run detect_edges to see shape boundaries, or detect_faces to check for people.",
+    suggestions=[
         "Run detect_edges to see the shape boundaries in this image",
         "Run detect_faces to check for people in this image",
     ])
@@ -152,7 +158,21 @@ def detect_faces(image_path: str, save_annotated: bool = True) -> dict:
         cv2.imwrite(out, img)
         result["annotated_image"] = out
 
-    return success_response("detect_faces", result, suggestions=[
+    if len(face_list) == 0:
+        msg = "No faces were detected in this image."
+    elif len(face_list) == 1:
+        msg = "Found 1 face in this image."
+    else:
+        msg = f"Found {len(face_list)} faces in this image."
+
+    if save_annotated and len(face_list) > 0:
+        msg += f" Annotated image saved to {result['annotated_image']}."
+
+    msg += " You could run analyze_image to get color and brightness stats, or detect_edges to see structural outlines."
+
+    return success_response("detect_faces", result,
+    message=msg,
+    suggestions=[
         "Run analyze_image to get color and brightness stats for this image",
         "Run detect_edges to see the structural outlines in this image",
     ])
